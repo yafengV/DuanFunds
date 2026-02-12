@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+.env
+
+# local persisted data
+/data/holdings.json
+/data/funds_cache.json

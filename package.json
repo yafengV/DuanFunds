@@ -1,0 +1,29 @@
+{
+  "name": "duanfunds",
+  "version": "1.0.0",
+  "description": "基金估值/持仓（类似养基宝）的本地 Web 应用",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yafengV/DuanFunds.git"
+  },
+  "keywords": [
+    "fund",
+    "estimate",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yafengV/DuanFunds/issues"
+  },
+  "homepage": "https://github.com/yafengV/DuanFunds#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
