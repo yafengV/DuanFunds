@@ -1,0 +1,13 @@
+services:
+  duanfunds:
+    build: .
+    container_name: duanfunds
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=3007
+    volumes:
+      - ./data:/app/data

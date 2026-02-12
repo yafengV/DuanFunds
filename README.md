@@ -50,6 +50,20 @@ HOST=0.0.0.0 PORT=3010 npm run start
 
 - `http://<本机IP>:3007`
 
+## Docker 部署
+
+```bash
+cd DuanFunds
+docker compose up -d --build
+# 访问 http://<服务器IP>:3007
+```
+
+停止：
+
+```bash
+docker compose down
+```
+
 ## 数据说明
 
 - **持仓金额**：你当前投入/持有的金额（用于计算当日收益）
@@ -70,4 +84,3 @@ HOST=0.0.0.0 PORT=3010 npm run start
 ```bash
 npm run dev
 ```
-
