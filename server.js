@@ -68,7 +68,29 @@ async function writeQuoteCache(code, quote) {
   await fs.writeFile(QUOTES_CACHE_PATH, JSON.stringify({ quotes, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
 }
 
-async function fetchFundQuoteOnline(code) {
+async function fetchFundQuoteViaFundMNewApi(code) {
+  const url = `https://fundmobapi.eastmoney.com/FundMNewApi/FundMNFInfo?pageIndex=1&pageSize=1&appType=ttjj&product=EFund&plat=Android&Version=1&deviceid=openclaw&Fcodes=${encodeURIComponent(code)}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0',
+      'Referer': 'https://fund.eastmoney.com/'
+    },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!res.ok) throw new Error(`FundM API failed: ${res.status}`);
+  const json = await res.json();
+  const row = Array.isArray(json?.Datas) ? json.Datas[0] : null;
+  if (!row) throw new Error('FundM API empty');
+  const pct = Number(row.GSZZL);
+  return {
+    code: String(row.FCODE || code),
+    name: String(row.SHORTNAME || ''),
+    date: String(row.GZTIME || row.PDATE || ''),
+    todayPct: Number.isFinite(pct) ? pct : null
+  };
+}
+
+async function fetchFundQuoteViaFundgz(code) {
   const url = `https://fundgz.1234567.com.cn/js/${encodeURIComponent(code)}.js?rt=${Date.now()}`;
   const res = await fetch(url, {
     headers: {
@@ -77,7 +99,7 @@ async function fetchFundQuoteOnline(code) {
     },
     signal: AbortSignal.timeout(8000)
   });
-  if (!res.ok) throw new Error(`Quote fetch failed: ${res.status}`);
+  if (!res.ok) throw new Error(`fundgz failed: ${res.status}`);
   const txt = await res.text();
   const data = safeJsonpToJson(txt);
   const pct = Number(data.gszzl);
@@ -87,6 +109,14 @@ async function fetchFundQuoteOnline(code) {
     date: data.gztime || data.jzrq || '',
     todayPct: Number.isFinite(pct) ? pct : null
   };
+}
+
+async function fetchFundQuoteOnline(code) {
+  try {
+    return await fetchFundQuoteViaFundMNewApi(code);
+  } catch (_) {
+    return await fetchFundQuoteViaFundgz(code);
+  }
 }
 
 async function fetchFundQuote(code) {
