@@ -3,5 +3,4 @@ node_modules/
 .env
 
 # local persisted data
-/data/holdings.json
-/data/funds_cache.json
+/data/*.json

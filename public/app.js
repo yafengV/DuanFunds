@@ -3,6 +3,23 @@ const navTitleEl = document.getElementById('navTitle');
 const navRightBtnEl = document.getElementById('navRightBtn');
 const footerHintEl = document.getElementById('footerHint');
 
+const TOKEN_KEY = 'duanfunds_token';
+const USER_KEY = 'duanfunds_user';
+
+function getToken(){ return localStorage.getItem(TOKEN_KEY) || ''; }
+function getUser(){
+  try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); }
+  catch { return null; }
+}
+function setSession(token, user){
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user || null));
+}
+function clearSession(){
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
 function fmtMoney(n){
   if(!Number.isFinite(n)) return '--';
   return n.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -10,8 +27,7 @@ function fmtMoney(n){
 function fmtPct(n){
   if(n === null || n === undefined) return '--';
   if(!Number.isFinite(n)) return '--';
-  const s = n.toFixed(2) + '%';
-  return s;
+  return n.toFixed(2) + '%';
 }
 function clsBySign(n){
   if(!Number.isFinite(n)) return '';
@@ -19,7 +35,6 @@ function clsBySign(n){
   if(n < 0) return 'neg';
   return '';
 }
-
 function toast(msg){
   const el = document.createElement('div');
   el.className = 'toast';
@@ -28,16 +43,37 @@ function toast(msg){
   setTimeout(()=>{ el.remove(); }, 2600);
 }
 
+function authHeaders(){
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function apiGet(url){
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: { ...authHeaders() } });
   const data = await res.json().catch(()=> ({}));
-  if(!res.ok) throw new Error(data?.message || data?.error || ('HTTP ' + res.status));
+  if(!res.ok){
+    if(res.status === 401 || res.status === 403){
+      clearSession();
+      if(location.hash !== '#/login') location.hash = '#/login';
+    }
+    throw new Error(data?.message || data?.error || ('HTTP ' + res.status));
+  }
   return data;
 }
 async function apiJson(url, body, method='POST'){
-  const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const res = await fetch(url, {
+    method,
+    headers:{'Content-Type':'application/json', ...authHeaders()},
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
   const data = await res.json().catch(()=> ({}));
-  if(!res.ok) throw new Error(data?.message || data?.error || ('HTTP ' + res.status));
+  if(!res.ok){
+    if(res.status === 401 || res.status === 403){
+      clearSession();
+      if(location.hash !== '#/login') location.hash = '#/login';
+    }
+    throw new Error(data?.message || data?.error || ('HTTP ' + res.status));
+  }
   return data;
 }
 
@@ -48,22 +84,116 @@ function parseHash(){
   return { path: '/' + (path || '' ).replace(/^\//,'') , params };
 }
 
-function setNav({title, rightText, rightHref}){
+function setNav({title, rightText, rightHref, onRightClick}){
   navTitleEl.textContent = title;
   if(rightText){
     navRightBtnEl.style.display = '';
     navRightBtnEl.textContent = rightText;
     navRightBtnEl.setAttribute('href', rightHref || '#/');
+    navRightBtnEl.onclick = onRightClick || null;
   }else{
     navRightBtnEl.style.display = 'none';
+    navRightBtnEl.onclick = null;
   }
 }
 
+async function loadLogin(){
+  setNav({title:'登录', rightText:'注册', rightHref:'#/register'});
+  footerHintEl.textContent = '登录后可查看并管理自己的基金持仓。';
+  viewEl.innerHTML = `
+    <div class="card">
+      <div class="muted" style="font-size:12px;margin-bottom:6px">用户名</div>
+      <input class="input" id="username" placeholder="请输入用户名" />
+      <div style="height:10px"></div>
+      <div class="muted" style="font-size:12px;margin-bottom:6px">密码</div>
+      <input class="input" id="password" type="password" placeholder="请输入密码" />
+      <div style="height:12px"></div>
+      <button class="btn" id="submit">登录</button>
+    </div>
+  `;
+
+  const usernameEl = document.getElementById('username');
+  const passwordEl = document.getElementById('password');
+  const submitEl = document.getElementById('submit');
+
+  submitEl.addEventListener('click', async ()=>{
+    const username = usernameEl.value.trim();
+    const password = passwordEl.value;
+    if(!username || !password) return toast('请填写用户名和密码');
+
+    submitEl.disabled = true;
+    submitEl.textContent = '登录中...';
+    try{
+      const r = await apiJson('/api/auth/login', { username, password });
+      setSession(r.token, r.user);
+      toast('登录成功');
+      location.hash = '#/';
+    }catch(e){
+      toast('登录失败：' + e.message);
+    }finally{
+      submitEl.disabled = false;
+      submitEl.textContent = '登录';
+    }
+  });
+}
+
+async function loadRegister(){
+  setNav({title:'注册', rightText:'登录', rightHref:'#/login'});
+  footerHintEl.textContent = '注册新账号后可独立管理自己的持仓数据。';
+  viewEl.innerHTML = `
+    <div class="card">
+      <div class="muted" style="font-size:12px;margin-bottom:6px">用户名（至少3位）</div>
+      <input class="input" id="username" placeholder="请输入用户名" />
+      <div style="height:10px"></div>
+      <div class="muted" style="font-size:12px;margin-bottom:6px">邮箱（可选）</div>
+      <input class="input" id="email" placeholder="请输入邮箱" />
+      <div style="height:10px"></div>
+      <div class="muted" style="font-size:12px;margin-bottom:6px">密码（至少6位）</div>
+      <input class="input" id="password" type="password" placeholder="请输入密码" />
+      <div style="height:12px"></div>
+      <button class="btn" id="submit">注册</button>
+    </div>
+  `;
+
+  const usernameEl = document.getElementById('username');
+  const emailEl = document.getElementById('email');
+  const passwordEl = document.getElementById('password');
+  const submitEl = document.getElementById('submit');
+
+  submitEl.addEventListener('click', async ()=>{
+    const username = usernameEl.value.trim();
+    const password = passwordEl.value;
+    const email = emailEl.value.trim();
+    if(username.length < 3) return toast('用户名至少3位');
+    if(password.length < 6) return toast('密码至少6位');
+
+    submitEl.disabled = true;
+    submitEl.textContent = '注册中...';
+    try{
+      const r = await apiJson('/api/auth/register', { username, password, email });
+      setSession(r.token, r.user);
+      toast('注册成功');
+      location.hash = '#/';
+    }catch(e){
+      toast('注册失败：' + e.message);
+    }finally{
+      submitEl.disabled = false;
+      submitEl.textContent = '注册';
+    }
+  });
+}
+
 async function loadHome(){
+  const user = getUser();
   setNav({title:'基金估值', rightText:'添加', rightHref:'#/search'});
   footerHintEl.textContent = '提示：名称列固定，其余列可左右滑动；接口异常会提示。';
 
   viewEl.innerHTML = `
+    <div class="card">
+      <div class="muted" style="font-size:12px">当前用户：${escapeHtml(user?.username || '--')}</div>
+      <div style="margin-top:8px"><button class="btn" id="logoutBtn" style="background:#64748b">退出登录</button></div>
+    </div>
+
     <div class="card">
       <div class="kpis">
         <div class="kpi">
@@ -102,6 +232,11 @@ async function loadHome(){
     </div>
   `;
 
+  document.getElementById('logoutBtn').addEventListener('click', ()=>{
+    clearSession();
+    location.hash = '#/login';
+  });
+
   const kpiTotalEl = document.getElementById('kpiTotal');
   const kpiTodayEl = document.getElementById('kpiToday');
   const kpiTimeEl = document.getElementById('kpiTime');
@@ -123,7 +258,6 @@ async function loadHome(){
     return;
   }
 
-  // Fetch quotes in parallel (best-effort)
   const quotes = new Map();
   const times = [];
   await Promise.all(holdings.map(async h => {
@@ -207,7 +341,7 @@ async function loadHome(){
       const code = btn.getAttribute('data-del');
       if(!confirm('确定删除持仓 ' + code + ' ？')) return;
       try{
-        await apiJson('/api/holdings/' + encodeURIComponent(code), null, 'DELETE');
+        await apiJson('/api/holdings/' + encodeURIComponent(code), undefined, 'DELETE');
         toast('已删除');
         await loadHome();
       }catch(e){
@@ -324,14 +458,8 @@ async function loadAdd(params){
   submitEl.addEventListener('click', async ()=>{
     const amount = Number(amountEl.value);
     const holdingProfit = Number(holdingProfitEl.value);
-    if(!Number.isFinite(amount) || amount < 0){
-      toast('请填写正确的持仓金额');
-      return;
-    }
-    if(!Number.isFinite(holdingProfit)){
-      toast('请填写正确的持有收益');
-      return;
-    }
+    if(!Number.isFinite(amount) || amount < 0) return toast('请填写正确的持仓金额');
+    if(!Number.isFinite(holdingProfit)) return toast('请填写正确的持有收益');
 
     submitEl.disabled = true;
     submitEl.textContent = '添加中...';
@@ -358,11 +486,24 @@ function escapeAttr(s){
 
 async function router(){
   const { path, params } = parseHash();
+  const token = getToken();
+  const publicRoutes = ['/login', '/register'];
+
+  if(!token && !publicRoutes.includes(path)){
+    location.hash = '#/login';
+    return;
+  }
+  if(token && publicRoutes.includes(path)){
+    location.hash = '#/';
+    return;
+  }
+
   if(path === '/' || path === '/home') return loadHome();
   if(path === '/search') return loadSearch();
   if(path === '/add') return loadAdd(params);
-  // default
-  location.hash = '#/';
+  if(path === '/login') return loadLogin();
+  if(path === '/register') return loadRegister();
+  location.hash = token ? '#/' : '#/login';
 }
 
 window.addEventListener('hashchange', router);
