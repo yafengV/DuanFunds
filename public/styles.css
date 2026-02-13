@@ -38,24 +38,23 @@ a{color:inherit}
 .btn--danger{border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.12)}
 
 .tableWrap{border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.tableHeader{display:flex;align-items:stretch;background:rgba(255,255,255,.03);border-bottom:1px solid var(--line)}
-.tableBody{max-height:56vh;overflow:auto}
+.tableScroll{overflow:auto;max-height:56vh}
+.fundTable{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0}
+.fundTable th,.fundTable td{padding:10px 10px;font-size:13px;white-space:nowrap;border-bottom:1px solid rgba(37,48,68,.6);border-right:1px solid rgba(37,48,68,.6);background:var(--card)}
+.fundTable th{font-size:12px;color:var(--muted);font-weight:600;background:rgba(255,255,255,.03);position:sticky;top:0;z-index:4}
+.fundTable tr:last-child td{border-bottom:none}
+.fundTable th:last-child,.fundTable td:last-child{border-right:none}
 
-.colName{min-width:130px;max-width:180px;flex:0 0 auto;position:sticky;left:0;z-index:3;background:linear-gradient(90deg, var(--card) 0%, var(--card) 92%, rgba(17,24,38,0) 100%);border-right:1px solid rgba(37,48,68,.9)}
-.cellName{padding:10px 10px}
+.fundTable .stickyCol{position:sticky;left:0;z-index:3;background:linear-gradient(90deg, var(--card) 0%, var(--card) 92%, rgba(17,24,38,0) 100%)}
+.fundTable th.stickyCol{z-index:5;background:linear-gradient(90deg, rgba(255,255,255,.03) 0%, rgba(255,255,255,.03) 92%, rgba(17,24,38,0) 100%)}
+.fundTable tr:nth-child(even) td{background:rgba(255,255,255,.01)}
+.fundTable tr:nth-child(even) td.stickyCol{background:linear-gradient(90deg, rgba(17,24,38,.98) 0%, rgba(17,24,38,.98) 92%, rgba(17,24,38,0) 100%)}
+
+.colNameCell{min-width:140px;max-width:180px}
+.colW{min-width:112px}
+.cellName{padding:0}
 .nameMain{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nameSub{font-size:12px;color:var(--muted);margin-top:2px}
-
-.scrollCols{overflow-x:auto}
-.colsInner{min-width:560px;display:flex}
-.col{min-width:110px;flex:0 0 auto;border-right:1px solid rgba(37,48,68,.6)}
-.col:last-child{border-right:none}
-.cell{padding:10px 10px;font-size:13px;white-space:nowrap}
-.headerCell{font-size:12px;color:var(--muted)}
-
-.tr{display:flex}
-.tr:nth-child(odd) .colName{background:linear-gradient(90deg, rgba(17,24,38,.98) 0%, rgba(17,24,38,.98) 92%, rgba(17,24,38,0) 100%)}
-.tr:nth-child(odd) .cellRowBg{background:rgba(255,255,255,.01)}
 
 .muted{color:var(--muted)}
 .pos{color:var(--pos)}

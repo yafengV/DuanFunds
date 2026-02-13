@@ -81,22 +81,22 @@ async function loadHome(){
     <div class="card">
       <div style="font-size:13px;color:var(--muted);margin-bottom:10px">持仓列表</div>
       <div class="tableWrap">
-        <div class="tableHeader">
-          <div class="colName">
-            <div class="cellName headerCell">名称</div>
-          </div>
-          <div class="scrollCols">
-            <div class="colsInner">
-              <div class="col"><div class="cell headerCell">持仓金额</div></div>
-              <div class="col"><div class="cell headerCell">当日涨幅</div></div>
-              <div class="col"><div class="cell headerCell">当日收益</div></div>
-              <div class="col"><div class="cell headerCell">持仓涨幅</div></div>
-              <div class="col"><div class="cell headerCell">持仓收益</div></div>
-              <div class="col"><div class="cell headerCell">操作</div></div>
-            </div>
-          </div>
+        <div class="tableScroll">
+          <table class="fundTable">
+            <thead>
+              <tr>
+                <th class="stickyCol colNameCell">名称</th>
+                <th class="colW">持仓金额</th>
+                <th class="colW">当日涨幅</th>
+                <th class="colW">当日收益</th>
+                <th class="colW">持仓涨幅</th>
+                <th class="colW">持仓收益</th>
+                <th class="colW">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
         </div>
-        <div class="tableBody" id="tableBody"></div>
       </div>
       <div class="muted" style="margin-top:10px;font-size:12px">说明：持仓涨幅/收益来自“持有收益”录入；当日收益=持仓金额×当日涨幅。</div>
     </div>
@@ -116,7 +116,7 @@ async function loadHome(){
   }
 
   if(!holdings.length){
-    tableBody.innerHTML = `<div style="padding:12px" class="muted">暂无持仓，点击右上角“添加”。</div>`;
+    tableBody.innerHTML = `<tr><td colspan="7" style="padding:12px" class="muted">暂无持仓，点击右上角“添加”。</td></tr>`;
     kpiTotalEl.textContent = fmtMoney(0);
     kpiTodayEl.textContent = fmtMoney(0);
     kpiTimeEl.textContent = '';
@@ -161,7 +161,8 @@ async function loadHome(){
       holdingPct,
       holdingProfit: hp,
       quoteDate: q.date || '',
-      quoteError: q.error || ''
+      quoteError: q.error || '',
+      quoteStale: Boolean(q.stale)
     });
   }
 
@@ -178,28 +179,26 @@ async function loadHome(){
     const holdingPctTxt = `<span class="${clsBySign(r.holdingPct)}">${(r.holdingPct>=0?'+':'') + fmtPct(r.holdingPct)}</span>`;
     const holdingProfitTxt = `<span class="${clsBySign(r.holdingProfit)}">${(r.holdingProfit>=0?'+':'') + fmtMoney(r.holdingProfit)}</span>`;
 
-    const err = r.quoteError ? `<div class="nameSub" style="color:var(--muted)">接口异常：${r.quoteError}</div>` : '';
+    const err = r.quoteError
+      ? `<div class="nameSub" style="color:var(--muted)">接口异常：${r.quoteError}</div>`
+      : (r.quoteStale ? `<div class="nameSub" style="color:var(--muted)">接口波动，已使用最近缓存估值</div>` : '');
 
     return `
-      <div class="tr">
-        <div class="colName">
+      <tr>
+        <td class="stickyCol colNameCell">
           <div class="cellName">
             <div class="nameMain">${escapeHtml(r.name || '--')}</div>
             <div class="nameSub">${escapeHtml(r.code)}</div>
             ${err}
           </div>
-        </div>
-        <div class="scrollCols cellRowBg">
-          <div class="colsInner">
-            <div class="col"><div class="cell">${fmtMoney(r.amt)}</div></div>
-            <div class="col"><div class="cell">${todayPctTxt}</div></div>
-            <div class="col"><div class="cell">${todayProfitTxt}</div></div>
-            <div class="col"><div class="cell">${holdingPctTxt}</div></div>
-            <div class="col"><div class="cell">${holdingProfitTxt}</div></div>
-            <div class="col"><div class="cell"><button class="btn btn--danger" data-del="${escapeAttr(r.code)}" style="padding:8px 10px">删除</button></div></div>
-          </div>
-        </div>
-      </div>
+        </td>
+        <td class="colW">${fmtMoney(r.amt)}</td>
+        <td class="colW">${todayPctTxt}</td>
+        <td class="colW">${todayProfitTxt}</td>
+        <td class="colW">${holdingPctTxt}</td>
+        <td class="colW">${holdingProfitTxt}</td>
+        <td class="colW"><button class="btn btn--danger" data-del="${escapeAttr(r.code)}" style="padding:8px 10px">删除</button></td>
+      </tr>
     `;
   }).join('');
 

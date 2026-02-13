@@ -15,11 +15,15 @@ const HOST = process.env.HOST || '0.0.0.0';
 const DATA_DIR = path.join(__dirname, 'data');
 const HOLDINGS_PATH = path.join(DATA_DIR, 'holdings.json');
 const FUNDS_CACHE_PATH = path.join(DATA_DIR, 'funds_cache.json');
+const QUOTES_CACHE_PATH = path.join(DATA_DIR, 'quotes_cache.json');
 
 async function ensureDataFiles() {
   await fs.mkdir(DATA_DIR, { recursive: true });
   if (!fssync.existsSync(HOLDINGS_PATH)) {
     await fs.writeFile(HOLDINGS_PATH, JSON.stringify({ holdings: [], updatedAt: new Date().toISOString() }, null, 2), 'utf8');
+  }
+  if (!fssync.existsSync(QUOTES_CACHE_PATH)) {
+    await fs.writeFile(QUOTES_CACHE_PATH, JSON.stringify({ quotes: {}, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
   }
 }
 
@@ -45,29 +49,62 @@ function safeJsonpToJson(text) {
   return JSON.parse(jsonStr);
 }
 
-async function fetchFundQuote(code) {
-  // Primary: fundgz.1234567.com.cn (commonly used)
+async function readQuotesCache() {
+  await ensureDataFiles();
+  const raw = await fs.readFile(QUOTES_CACHE_PATH, 'utf8');
+  const json = JSON.parse(raw || '{}');
+  return json?.quotes && typeof json.quotes === 'object' ? json.quotes : {};
+}
+
+async function writeQuoteCache(code, quote) {
+  const quotes = await readQuotesCache();
+  quotes[String(code)] = {
+    code: String(quote.code || code),
+    name: String(quote.name || ''),
+    date: String(quote.date || ''),
+    todayPct: Number.isFinite(quote.todayPct) ? Number(quote.todayPct) : null,
+    cachedAt: new Date().toISOString()
+  };
+  await fs.writeFile(QUOTES_CACHE_PATH, JSON.stringify({ quotes, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
+}
+
+async function fetchFundQuoteOnline(code) {
   const url = `https://fundgz.1234567.com.cn/js/${encodeURIComponent(code)}.js?rt=${Date.now()}`;
   const res = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0',
       'Referer': 'https://fund.eastmoney.com/'
-    }
+    },
+    signal: AbortSignal.timeout(8000)
   });
   if (!res.ok) throw new Error(`Quote fetch failed: ${res.status}`);
   const txt = await res.text();
   const data = safeJsonpToJson(txt);
-
-  // Expected keys: fundcode,name,jzrq,dwjz,gsz,gszzl,gztime
   const pct = Number(data.gszzl);
   return {
     code: data.fundcode || code,
     name: data.name || '',
     date: data.gztime || data.jzrq || '',
-    todayPct: Number.isFinite(pct) ? pct : null,
-    // for debug
-    raw: data
+    todayPct: Number.isFinite(pct) ? pct : null
   };
+}
+
+async function fetchFundQuote(code) {
+  try {
+    const online = await fetchFundQuoteOnline(code);
+    await writeQuoteCache(code, online);
+    return { ...online, source: 'live' };
+  } catch (e) {
+    const quotes = await readQuotesCache();
+    const cached = quotes[String(code)];
+    if (cached && cached.cachedAt) {
+      const ageMs = Date.now() - new Date(cached.cachedAt).getTime();
+      if (Number.isFinite(ageMs) && ageMs < 24 * 3600 * 1000) {
+        return { ...cached, source: 'cache', stale: true };
+      }
+    }
+    throw e;
+  }
 }
 
 async function loadFundListCached() {
@@ -181,7 +218,7 @@ app.get('/api/quote/:code', async (req, res) => {
     const q = await fetchFundQuote(code);
     res.json(q);
   } catch (e) {
-    res.status(503).json({ error: 'quote unavailable', message: String(e?.message || e) });
+    res.status(503).json({ error: 'quote unavailable', message: '估值接口暂不可用，请稍后重试' });
   }
 });
 
